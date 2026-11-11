@@ -1,0 +1,33 @@
+groups:
+  - name: music-cloud
+    rules:
+      - alert: MusicCloudApiDown
+        expr: up{job="mc-api"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "mc-api недоступен"
+          description: "Prometheus не может scrape-ить mc-api дольше 2 минут."
+
+      - alert: MusicCloudPostgresDown
+        expr: up{job="postgres"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "PostgreSQL недоступен"
+          description: "postgres-exporter не отвечает дольше 2 минут."
+
+      - alert: MusicCloudHighErrorRate
+        expr: |
+          sum(rate(http_requests_total{status=~"5.."}[5m]))
+          /
+          clamp_min(sum(rate(http_requests_total[5m])), 0.001)
+          > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Высокая доля 5xx в mc-api"
+          description: "Больше 5% HTTP-запросов завершаются ошибкой 5xx."

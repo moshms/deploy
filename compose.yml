@@ -1,0 +1,196 @@
+name: music-cloud
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: musiccloud
+      POSTGRES_USER: musiccloud
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U musiccloud -d musiccloud"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  mc-api:
+    image: ${MC_IMAGE_PREFIX:-ghcr.io/moshms}/api:${MC_TAG:-v0.1.0}
+    restart: unless-stopped
+    environment:
+      MC_BIND_ADDR: 0.0.0.0:8080
+      MC_DATABASE_URL: postgres://musiccloud:${POSTGRES_PASSWORD}@postgres:5432/musiccloud
+      MC_DATABASE_MAX_CONNECTIONS: ${MC_DATABASE_MAX_CONNECTIONS:-10}
+      MC_LOG_JSON: "true"
+      MC_LOG_FILTER: ${MC_LOG_FILTER:-info}
+      MC_METRICS: ${MC_METRICS:-false}
+      MC_ADMIN_USER: ${MC_ADMIN_USER:-admin}
+      MC_ADMIN_PASSWORD: ${MC_ADMIN_PASSWORD:-}
+      MC_LIBRARY_PATH: /library
+      MC_LIBRARY_NAME: ${MC_LIBRARY_NAME:-Music}
+      MC_SCAN_ON_START: ${MC_SCAN_ON_START:-false}
+      MC_SESSION_TTL_HOURS: ${MC_SESSION_TTL_HOURS:-720}
+      MC_COOKIE_SECURE: ${MC_COOKIE_SECURE:-false}
+      MC_TRANSCODER_URL: ${MC_TRANSCODER_URL:-http://mc-transcoder:50051}
+      MC_MASTER_KEY: ${MC_MASTER_KEY:-}
+      MC_STAGING_PATH: /staging
+      MC_MAX_UPLOAD_BYTES: ${MC_MAX_UPLOAD_BYTES:-4294967296}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ${MC_LIBRARY_PATH:-./library}:/library
+      - staging:/staging
+    user: "${MC_UID:-65534}:${MC_GID:-65534}"
+    healthcheck:
+      test: ["CMD", "/mc-api", "healthcheck"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+      start_period: 15s
+
+  mc-worker:
+    image: ${MC_IMAGE_PREFIX:-ghcr.io/moshms}/worker:${MC_TAG:-v0.1.0}
+    profiles: ["worker"]
+    restart: unless-stopped
+    environment:
+      MC_DATABASE_URL: postgres://musiccloud:${POSTGRES_PASSWORD}@postgres:5432/musiccloud
+      MC_DATABASE_MAX_CONNECTIONS: ${MC_DATABASE_MAX_CONNECTIONS:-5}
+      MC_MASTER_KEY: ${MC_MASTER_KEY:-}
+      MC_HEALTH_ADDR: 0.0.0.0:8081
+      MC_WORKER_ID: ${MC_WORKER_ID:-worker-1}
+      MC_SCAN_INTERVAL_SECONDS: ${MC_SCAN_INTERVAL_SECONDS:-300}
+      MC_IMPORT_PATH_TEMPLATE: ${MC_IMPORT_PATH_TEMPLATE:-}
+      MC_LOG_JSON: "true"
+      MC_LOG_FILTER: ${MC_LOG_FILTER:-info}
+      MC_METRICS: ${MC_METRICS:-false}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mc-api:
+        condition: service_healthy
+    volumes:
+      - ${MC_LIBRARY_PATH:-./library}:/library
+    user: "${MC_UID:-65534}:${MC_GID:-65534}"
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/mc-worker", "healthcheck"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+      start_period: 15s
+
+  mc-transcoder:
+    image: ${MC_IMAGE_PREFIX:-ghcr.io/moshms}/transcoder:${MC_TAG:-v0.1.0}
+    profiles: ["transcode"]
+    restart: unless-stopped
+    environment:
+      MC_BIND_ADDR: 0.0.0.0:50051
+      MC_LIBRARY_PATH: /library
+      MC_CACHE_DIR: /cache
+      MC_CACHE_MAX_BYTES: ${MC_TRANSCODE_CACHE_BYTES:-10737418240}
+      MC_METRICS: ${MC_METRICS:-false}
+      MC_METRICS_ADDR: 0.0.0.0:8082
+      MC_LOG_JSON: "true"
+      MC_LOG_FILTER: ${MC_LOG_FILTER:-info}
+    volumes:
+      - ${MC_LIBRARY_PATH:-./library}:/library:ro
+      - cache-transcode:/cache
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/mc-transcoder", "healthcheck"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+      start_period: 10s
+
+  nginx:
+    image: ${MC_IMAGE_PREFIX:-ghcr.io/moshms}/web:${MC_TAG:-v0.1.0}
+    restart: unless-stopped
+    environment:
+      MC_DOMAIN: ${MC_DOMAIN:-_}
+      MC_TLS: ${MC_TLS:-off}
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+    depends_on:
+      mc-api:
+        condition: service_healthy
+    volumes:
+      - ${MC_LIBRARY_PATH:-./library}:/library:ro
+      - certbot-www:/var/www/certbot:ro
+      - certbot-certs:/etc/letsencrypt:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1/nginx-health || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+      start_period: 5s
+
+  certbot:
+    image: certbot/certbot:latest
+    profiles: ["tls"]
+    restart: unless-stopped
+    volumes:
+      - certbot-www:/var/www/certbot
+      - certbot-certs:/etc/letsencrypt
+    entrypoint: /bin/sh
+    command: -c "trap exit TERM; while :; do certbot renew --webroot -w /var/www/certbot --quiet; sleep 12h & wait $${!}; done"
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    profiles: ["home"]
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN:-}
+    depends_on:
+      nginx:
+        condition: service_healthy
+
+  prometheus:
+    image: prom/prometheus:latest
+    profiles: ["monitoring"]
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prometheus-data:/prometheus
+    ports:
+      - "127.0.0.1:${PROMETHEUS_PORT:-9090}:9090"
+
+  grafana:
+    image: grafana/grafana:latest
+    profiles: ["monitoring"]
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "127.0.0.1:${GRAFANA_PORT:-3000}:3000"
+    depends_on:
+      - prometheus
+
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:latest
+    profiles: ["monitoring"]
+    restart: unless-stopped
+    environment:
+      DATA_SOURCE_NAME: postgresql://musiccloud:${POSTGRES_PASSWORD}@postgres:5432/musiccloud?sslmode=disable
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+  staging:
+  cache-transcode:
+  certbot-www:
+  certbot-certs:
+  prometheus-data:
+  grafana-data:
