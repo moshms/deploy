@@ -20,4 +20,4 @@ jobs:
       - name: Validate compose
         run: docker compose -f compose.yml --env-file .env.example config >/dev/null
       - name: Validate shell script
-        run: sh -n scripts/measure.sh
+        run: sh -n scripts/measure.sh scripts/offline-bundle.sh
