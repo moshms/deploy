@@ -44,6 +44,12 @@ sudo mkdir -p /srv/music-cloud/library
 sudo chown -R 65534:65534 /srv/music-cloud/library
 ```
 
+Образы лежат в приватном GHCR. Войдите токеном с правом `read:packages`:
+
+```bash
+echo "$GHCR_TOKEN" | docker login ghcr.io -u YOUR_GITHUB_USER --password-stdin
+```
+
 Запуск:
 
 ```bash
@@ -208,7 +214,7 @@ ssh -L 9090:127.0.0.1:9090 -L 3000:127.0.0.1:3000 user@server
 
 ## Обновление
 
-Образы собираются CI только по тегам в `main`. Для обновления:
+Образы собираются CI только по тегам в репозиториях сервисов. Для обновления:
 
 ```bash
 # в .env поменять MC_TAG на новый тег
@@ -227,7 +233,9 @@ docker compose -f compose.yml --env-file .env up -d
 `mc-cli` устанавливает стек, управляет профилями, администраторами, миграциями, бэкапом и диагностикой.
 
 ```bash
-cargo install --path services/mc-cli --locked
+# готовый бинарь из релиза
+gh release download v0.1.0 --repo moshms/cli --pattern mc-cli
+chmod +x mc-cli && sudo mv mc-cli /usr/local/bin/
 
 mc-cli --dir /opt/music-cloud install \
   --library /srv/music-cloud/library \
@@ -246,20 +254,19 @@ mc-cli --dir /opt/music-cloud doctor
 
 `install --no-docker` пишет `music-cloud.env` и systemd-юниты для нативного запуска бинарников.
 
-## Статус
+## Репозитории
 
-Этапы 1–11 реализованы. Этап 12 — замер ресурсов и план разбиения (сам перенос репозитория не выполнялся). [docs/resource-usage.md](docs/resource-usage.md), [docs/repo-split.md](docs/repo-split.md).
+- [core](https://github.com/moshms/core) — общие библиотеки.
+- [api](https://github.com/moshms/api) — HTTP/Subsonic API.
+- [worker](https://github.com/moshms/worker) — сканы и импорт.
+- [transcoder](https://github.com/moshms/transcoder) — ffmpeg/gRPC.
+- [web](https://github.com/moshms/web) — SPA и nginx-образ.
+- [gateway](https://github.com/moshms/gateway) — nginx-конфиги.
+- [cli](https://github.com/moshms/cli) — установщик.
+- [deploy](https://github.com/moshms/deploy) — этот репозиторий.
 
-## Разработка
+## Ресурсы
 
-```bash
-cargo fmt --all -- --check
-cargo clippy --workspace --all-targets --all-features -- -D warnings
-cargo test --workspace --all-features
+Замеры: [docs/resource-usage.md](docs/resource-usage.md). План разбиения: [docs/repo-split.md](docs/repo-split.md).
 
-cd web
-npm ci
-npm run build
-```
-
-CI запускается на всех ветках и PR. Контейнеры публикуются в GHCR только по тегам `v*`.
+CI запускается на всех ветках и PR. Образы публикуются только по тегам `v*`.
