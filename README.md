@@ -234,7 +234,7 @@ docker compose -f compose.yml --env-file .env up -d
 
 ```bash
 # готовый бинарь из релиза
-gh release download v0.1.0 --repo moshms/cli --pattern mc-cli
+gh release download --repo moshms/cli --pattern mc-cli
 chmod +x mc-cli && sudo mv mc-cli /usr/local/bin/
 
 mc-cli --dir /opt/music-cloud install \
@@ -250,6 +250,7 @@ mc-cli --dir /opt/music-cloud migrate
 mc-cli --dir /opt/music-cloud export --output backup.sql
 mc-cli --dir /opt/music-cloud import --file backup.sql
 mc-cli --dir /opt/music-cloud doctor
+mc-cli --dir /opt/music-cloud update --tag v0.1.1 --ghcr-user YOUR_GITHUB_USER
 ```
 
 `install --no-docker` пишет `music-cloud.env` и systemd-юниты для нативного запуска бинарников.
