@@ -228,6 +228,52 @@ docker compose -f compose.yml --env-file .env up -d
 - Библиотека: обычный бэкап каталога `MC_LIBRARY_PATH`.
 - Секреты: `.env` (там `POSTGRES_PASSWORD` и `MC_MASTER_KEY`).
 
+## Сервер без GitHub
+
+GitHub CLI на сервере не нужен. Достаточно Docker и токена GHCR с `read:packages`.
+
+Вариант 1 — скопировать deploy-репозиторий и `mc-cli` с машины, где GitHub доступен:
+
+```bash
+git clone git@github.com:moshms/deploy.git
+gh release download --repo moshms/cli --pattern mc-cli
+
+scp -r deploy user@server:/opt/music-cloud
+scp mc-cli user@server:/usr/local/bin/mc-cli
+```
+
+На сервере:
+
+```bash
+cd /opt/music-cloud
+cp .env.example .env
+# заполнить .env
+
+echo "$GHCR_TOKEN" | docker login ghcr.io -u YOUR_GITHUB_USER --password-stdin
+docker compose -f compose.yml --env-file .env pull
+docker compose -f compose.yml --env-file .env up -d
+```
+
+Вариант 2 — полностью offline bundle. На машине с Docker и доступом к GHCR:
+
+```bash
+echo "$GHCR_TOKEN" | docker login ghcr.io -u YOUR_GITHUB_USER --password-stdin
+INCLUDE_MONITORING=1 ./scripts/offline-bundle.sh music-cloud-bundle
+scp -r music-cloud-bundle user@server:/opt/music-cloud
+```
+
+На сервере:
+
+```bash
+cd /opt/music-cloud
+docker load -i music-cloud-images.tar
+cp .env.example .env
+# заполнить .env
+docker compose -f compose.yml --env-file .env up -d
+```
+
+Флаги bundle: `INCLUDE_MONITORING=1`, `INCLUDE_TLS=1`, `INCLUDE_HOME=1`.
+
 ## CLI
 
 `mc-cli` устанавливает стек, управляет профилями, администраторами, миграциями, бэкапом и диагностикой.
