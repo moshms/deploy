@@ -17,7 +17,7 @@ services:
       retries: 12
 
   mc-api:
-    image: ${MC_IMAGE_PREFIX:-ghcr.io/moshms}/api:${MC_TAG:-v0.1.1}
+    image: ${MC_IMAGE_PREFIX:-ghcr.io/moshms}/api:${MC_TAG:-v0.2.0}
     restart: unless-stopped
     environment:
       MC_BIND_ADDR: 0.0.0.0:8080
@@ -30,6 +30,7 @@ services:
       MC_ADMIN_PASSWORD: ${MC_ADMIN_PASSWORD:-}
       MC_LIBRARY_PATH: /library
       MC_LIBRARY_NAME: ${MC_LIBRARY_NAME:-Music}
+      MC_LIBRARY_ACCESS: ${MC_LIBRARY_ACCESS:-closed}
       MC_SCAN_ON_START: ${MC_SCAN_ON_START:-false}
       MC_SESSION_TTL_HOURS: ${MC_SESSION_TTL_HOURS:-720}
       MC_COOKIE_SECURE: ${MC_COOKIE_SECURE:-false}
@@ -52,7 +53,7 @@ services:
       start_period: 15s
 
   mc-worker:
-    image: ${MC_IMAGE_PREFIX:-ghcr.io/moshms}/worker:${MC_TAG:-v0.1.1}
+    image: ${MC_IMAGE_PREFIX:-ghcr.io/moshms}/worker:${MC_TAG:-v0.2.0}
     profiles: ["worker"]
     restart: unless-stopped
     environment:
@@ -82,7 +83,7 @@ services:
       start_period: 15s
 
   mc-transcoder:
-    image: ${MC_IMAGE_PREFIX:-ghcr.io/moshms}/transcoder:${MC_TAG:-v0.1.1}
+    image: ${MC_IMAGE_PREFIX:-ghcr.io/moshms}/transcoder:${MC_TAG:-v0.2.0}
     profiles: ["transcode"]
     restart: unless-stopped
     environment:
@@ -105,7 +106,7 @@ services:
       start_period: 10s
 
   nginx:
-    image: ${MC_IMAGE_PREFIX:-ghcr.io/moshms}/web:${MC_TAG:-v0.1.1}
+    image: ${MC_IMAGE_PREFIX:-ghcr.io/moshms}/web:${MC_TAG:-v0.2.0}
     restart: unless-stopped
     environment:
       MC_DOMAIN: ${MC_DOMAIN:-_}
