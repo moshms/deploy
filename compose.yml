@@ -91,6 +91,7 @@ services:
     environment:
       MC_BIND_ADDR: 0.0.0.0:50051
       MC_LIBRARY_PATH: /library
+      MC_STAGING_PATH: /staging
       MC_CACHE_DIR: /cache
       MC_CACHE_MAX_BYTES: ${MC_TRANSCODE_CACHE_BYTES:-10737418240}
       MC_METRICS: ${MC_METRICS:-false}
@@ -99,6 +100,7 @@ services:
       MC_LOG_FILTER: ${MC_LOG_FILTER:-info}
     volumes:
       - ${MC_LIBRARY_PATH:-./library}:/library:ro
+      - staging:/staging
       - cache-transcode:/cache
     healthcheck:
       test: ["CMD", "/usr/local/bin/mc-transcoder", "healthcheck"]
