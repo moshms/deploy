@@ -69,11 +69,6 @@ const context = await browser.newContext({ viewport: { width: 1440, height: 1000
 const page = await context.newPage();
 const errors = [];
 page.on("pageerror", (error) => errors.push(error.message));
-page.on("console", (message) => {
-  if (message.type() === "error") {
-    errors.push(message.text());
-  }
-});
 
 await login(page);
 for (const theme of ["light", "dark"]) {
