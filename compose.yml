@@ -17,7 +17,7 @@ services:
       retries: 12
 
   mc-api:
-    image: ${MC_IMAGE_PREFIX:-ghcr.io/moshms}/api:${MC_TAG:-v0.4.9}
+    image: ${MC_IMAGE_PREFIX:-ghcr.io/moshms}/api:${MC_TAG:-v0.4.10}
     restart: unless-stopped
     environment:
       MC_BIND_ADDR: 0.0.0.0:8080
@@ -55,7 +55,7 @@ services:
       start_period: 15s
 
   mc-worker:
-    image: ${MC_IMAGE_PREFIX:-ghcr.io/moshms}/worker:${MC_TAG:-v0.4.9}
+    image: ${MC_IMAGE_PREFIX:-ghcr.io/moshms}/worker:${MC_TAG:-v0.4.10}
     profiles: ["worker"]
     restart: unless-stopped
     environment:
@@ -85,7 +85,7 @@ services:
       start_period: 15s
 
   mc-transcoder:
-    image: ${MC_IMAGE_PREFIX:-ghcr.io/moshms}/transcoder:${MC_TAG:-v0.4.9}
+    image: ${MC_IMAGE_PREFIX:-ghcr.io/moshms}/transcoder:${MC_TAG:-v0.4.10}
     profiles: ["transcode"]
     restart: unless-stopped
     environment:
@@ -110,7 +110,7 @@ services:
       start_period: 10s
 
   nginx:
-    image: ${MC_IMAGE_PREFIX:-ghcr.io/moshms}/web:${MC_TAG:-v0.4.9}
+    image: ${MC_IMAGE_PREFIX:-ghcr.io/moshms}/web:${MC_TAG:-v0.4.10}
     restart: unless-stopped
     environment:
       MC_DOMAIN: ${MC_DOMAIN:-_}
