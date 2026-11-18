@@ -62,6 +62,7 @@ jobs:
           MC_COOKIE_SECURE=false
           HTTP_PORT=18080
           HTTPS_PORT=18443
+          GRAFANA_ADMIN_PASSWORD=smoke-grafana-password
           EOF
           docker compose --env-file .env.smoke up -d postgres mc-api nginx
           for i in $(seq 1 60); do
