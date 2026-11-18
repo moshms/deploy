@@ -1,0 +1,82 @@
+name: smoke
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/checkout@v4
+        with:
+          repository: moshms/core
+          path: src/core
+          token: ${{ secrets.ORG_READ_TOKEN }}
+      - uses: actions/checkout@v4
+        with:
+          repository: moshms/api
+          path: src/api
+          token: ${{ secrets.ORG_READ_TOKEN }}
+      - uses: actions/checkout@v4
+        with:
+          repository: moshms/worker
+          path: src/worker
+          token: ${{ secrets.ORG_READ_TOKEN }}
+      - uses: actions/checkout@v4
+        with:
+          repository: moshms/web
+          path: src/web
+          token: ${{ secrets.ORG_READ_TOKEN }}
+      - uses: actions/checkout@v4
+        with:
+          repository: moshms/transcoder
+          path: src/transcoder
+          token: ${{ secrets.ORG_READ_TOKEN }}
+
+      - name: Build images
+        env:
+          CORE_TOKEN: ${{ secrets.ORG_READ_TOKEN }}
+        run: |
+          printf '%s' "$CORE_TOKEN" > "$RUNNER_TEMP/core_token"
+          chmod 600 "$RUNNER_TEMP/core_token"
+          docker build --secret id=core_token,src="$RUNNER_TEMP/core_token" -t moshms/api:smoke src/api
+          docker build --secret id=core_token,src="$RUNNER_TEMP/core_token" -t moshms/worker:smoke src/worker
+          docker build --secret id=core_token,src="$RUNNER_TEMP/core_token" -t moshms/transcoder:smoke src/transcoder
+          docker build -t moshms/web:smoke src/web
+
+      - name: Run compose smoke
+        run: |
+          mkdir -p library
+          cat > .env.smoke <<EOF
+          POSTGRES_PASSWORD=smoke-password
+          MC_IMAGE_PREFIX=moshms
+          MC_TAG=smoke
+          MC_LIBRARY_PATH=$PWD/library
+          MC_SETUP_TOKEN=smoke-setup-token
+          MC_LIBRARY_ACCESS=closed
+          MC_COOKIE_SECURE=false
+          HTTP_PORT=18080
+          HTTPS_PORT=18443
+          EOF
+          docker compose --env-file .env.smoke up -d postgres mc-api nginx
+          for i in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:18080/nginx-health >/dev/null; then break; fi
+            sleep 2
+          done
+          curl -fsS http://127.0.0.1:18080/nginx-health
+          curl -fsS http://127.0.0.1:18080/readyz
+          curl -fsS http://127.0.0.1:18080/ | grep -q '<div id="root">'
+          docker compose --env-file .env.smoke ps
+
+      - name: Logs on failure
+        if: failure()
+        run: docker compose --env-file .env.smoke logs --no-color
+
+      - name: Stop stack
+        if: always()
+        run: docker compose --env-file .env.smoke down -v
