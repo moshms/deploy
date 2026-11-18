@@ -74,6 +74,28 @@ jobs:
           curl -fsS http://127.0.0.1:18080/ | grep -q '<div id="root">'
           docker compose --env-file .env.smoke ps
 
+      - name: Screenshots and layout checks
+        run: |
+          mkdir -p screens
+          docker run --rm --network host \
+            -v "$PWD/scripts:/scripts:ro" \
+            -v "$PWD/screens:/screens" \
+            -e BASE_URL=http://127.0.0.1:18080 \
+            -e SETUP_TOKEN=smoke-setup-token \
+            -e ADMIN_PASSWORD=secret123456 \
+            mcr.microsoft.com/playwright:v1.51.1-jammy sh -c '
+              cd /tmp &&
+              npm init -y >/dev/null &&
+              npm install playwright-core@1.51.1 >/dev/null &&
+              node /scripts/screenshots.mjs
+            '
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: screenshots
+          path: screens
+
       - name: Logs on failure
         if: failure()
         run: docker compose --env-file .env.smoke logs --no-color
