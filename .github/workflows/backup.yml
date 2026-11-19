@@ -17,7 +17,7 @@ jobs:
         env:
           POSTGRES_PASSWORD: backup-test
         run: |
-          printf 'POSTGRES_PASSWORD=backup-test\n' > .env.backup
+          printf 'POSTGRES_PASSWORD=backup-test\nGRAFANA_ADMIN_PASSWORD=backup-test\n' > .env.backup
           docker compose --env-file .env.backup up -d postgres
           for i in $(seq 1 30); do
             docker compose --env-file .env.backup exec -T postgres pg_isready -U musiccloud -d musiccloud && break
