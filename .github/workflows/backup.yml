@@ -1,0 +1,42 @@
+name: backup
+
+on:
+  schedule:
+    - cron: "0 3 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  restore-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Start postgres
+        env:
+          POSTGRES_PASSWORD: backup-test
+        run: |
+          printf 'POSTGRES_PASSWORD=backup-test\n' > .env.backup
+          docker compose --env-file .env.backup up -d postgres
+          for i in $(seq 1 30); do
+            docker compose --env-file .env.backup exec -T postgres pg_isready -U musiccloud -d musiccloud && break
+            sleep 1
+          done
+      - name: Create probe and backup
+        env:
+          POSTGRES_PASSWORD: backup-test
+        run: |
+          docker compose --env-file .env.backup exec -T postgres psql -U musiccloud -d musiccloud -c "CREATE TABLE backup_probe (id int PRIMARY KEY); INSERT INTO backup_probe VALUES (42);"
+          sh scripts/backup.sh backups
+      - name: Restore into verification database
+        env:
+          POSTGRES_PASSWORD: backup-test
+        run: |
+          docker compose --env-file .env.backup exec -T postgres createdb -U musiccloud restore_check
+          gunzip -c backups/db-*.sql.gz | docker compose --env-file .env.backup exec -T postgres psql -U musiccloud restore_check
+          VALUE=$(docker compose --env-file .env.backup exec -T postgres psql -U musiccloud restore_check -tAc "SELECT id FROM backup_probe")
+          test "$VALUE" = "42"
+      - name: Stop stack
+        if: always()
+        run: docker compose --env-file .env.backup down -v
