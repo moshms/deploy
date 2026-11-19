@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-TAG="${MC_TAG:-v0.4.12}"
+TAG="${MC_TAG:-v0.5.0}"
 PREFIX="${MC_IMAGE_PREFIX:-ghcr.io/moshms}"
 OUT="${1:-music-cloud-bundle}"
 
