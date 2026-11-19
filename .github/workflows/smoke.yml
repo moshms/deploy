@@ -86,7 +86,7 @@ jobs:
             mcr.microsoft.com/playwright:v1.51.1-jammy sh -c '
               cd /tmp &&
               npm init -y >/dev/null &&
-              npm install playwright-core@1.51.1 >/dev/null &&
+              npm install playwright-core@1.51.1 axe-core@4 >/dev/null &&
               cp /scripts/screenshots.mjs /tmp/screenshots.mjs &&
               node /tmp/screenshots.mjs
             '

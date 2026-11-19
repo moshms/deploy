@@ -42,6 +42,21 @@ async function setTheme(page, theme) {
   await page.waitForLoadState("networkidle");
 }
 
+async function checkA11y(page, label) {
+  await page.addScriptTag({ path: "/tmp/node_modules/axe-core/axe.min.js" });
+  const violations = await page.evaluate(async () => {
+    const result = await axe.run(document, {
+      runOnly: { type: "tag", values: ["wcag2a", "wcag2aa"] },
+    });
+    return result.violations
+      .filter((violation) => violation.impact === "critical")
+      .map((violation) => `${violation.id}: ${violation.help}`);
+  });
+  if (violations.length > 0) {
+    throw new Error(`${label}: a11y ${violations.join(" | ")}`);
+  }
+}
+
 async function checkLayout(page, label) {
   const overflow = await page.evaluate(
     () => document.documentElement.scrollWidth > window.innerWidth + 2,
@@ -77,6 +92,7 @@ for (const theme of ["light", "dark"]) {
     await page.goto(`${BASE}${path}`);
     await page.waitForLoadState("networkidle");
     await checkLayout(page, `${theme}-${name}`);
+    await checkA11y(page, `${theme}-${name}`);
     await page.screenshot({ path: `${OUT}/${theme}-${name}.png`, fullPage: true });
   }
 }
