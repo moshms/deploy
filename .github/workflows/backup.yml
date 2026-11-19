@@ -27,7 +27,9 @@ jobs:
       - name: Create probe and backup
         env:
           POSTGRES_PASSWORD: backup-test
+          COMPOSE_ENV: .env.backup
         run: |
+          mkdir -p library
           docker compose --env-file .env.backup exec -T postgres psql -U musiccloud -d musiccloud -c "CREATE TABLE backup_probe (id int PRIMARY KEY); INSERT INTO backup_probe VALUES (42);"
           sh scripts/backup.sh backups
       - name: Restore into verification database
